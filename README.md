@@ -1,3 +1,9 @@
-To Run code
-first -  docker-compose build
-then -  docker-compose up
+# How To Run The Challenge
+- First run 
+ ``` bash
+docker-compose build
+``` 
+- Then run
+``` bash
+docker-compose up
+``` 
