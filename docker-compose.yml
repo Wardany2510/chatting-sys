@@ -1,0 +1,79 @@
+version: '3.7'
+services:
+  db:
+    image: mysql:8.0.20
+    platform: linux/x86_64
+    volumes:
+      - mysql:/var/lib/mysql:delegated
+    restart: always
+    ports:
+      - '3307:3306'
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - '6380:6380'
+    volumes:
+      - ./volumes/redis-data:/data
+    command: redis-server
+  web:
+    build: .
+    command: bash -c "bash ./init.sh && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    environment:
+      - REDIS_HOST=redis
+      - ES_HOST=es01
+    links:
+      - db
+      - redis
+      - es01
+    depends_on:
+      - db
+      - redis
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/myapp
+      - bundle:/usr/local/bundle:delegated
+      - node_modules:/myapp/node_modules
+      - tmp-data:/myapp/tmp/sockets
+  sidekiq:
+    build: .
+    volumes:
+      - .:/myapp
+    env_file:
+      - .env  
+    command: bundle exec sidekiq
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
+    container_name: es01
+    environment:
+      - cluster.name=es-docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - data01:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200  
+  rufus_worker:
+    build: .
+    command: rake rufus_job
+    depends_on:
+      - web
+      - db
+    volumes:
+      - .:/myapp
+volumes:
+  mysql:
+  bundle:
+  node_modules:
+  tmp-data:
+  redis:
+  data01:
